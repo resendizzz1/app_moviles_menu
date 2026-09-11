@@ -32,3 +32,27 @@ val Typography = Typography(
     )
     */
 )
+
+// Estilos de texto personalizados para la tienda de donas
+val MenuTitleStyle = TextStyle(
+    fontFamily = FontFamily.Cursive,
+    fontWeight = FontWeight.Bold,
+    fontSize = 50.sp
+)
+
+val CategoryTitleStyle = TextStyle(
+    fontFamily = FontFamily.Cursive,
+    fontWeight = FontWeight.Bold,
+    fontSize = 40.sp
+)
+
+val ProductNameStyle = TextStyle(
+    fontFamily = FontFamily.Cursive,
+    fontWeight = FontWeight.Bold,
+    fontSize = 26.sp
+)
+
+val ProductPriceStyle = TextStyle(
+    fontWeight = FontWeight.Medium,
+    fontSize = 18.sp
+)
