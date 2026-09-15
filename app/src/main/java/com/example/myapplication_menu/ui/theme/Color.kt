@@ -17,3 +17,10 @@ val CocoaBrown = Color(0xFF795548)
 
 // Color de fondo de la app (tono crema muy suave y cálido)
 val CreamBackground = Color(0xFFFFF9F5)
+
+// Colores para el Dark Mode
+val DarkDonutPink = Color(0xFFF48FB1)
+val DarkChocolateBrown = Color(0xFFD7CCC8)
+val DarkCocoaBrown = Color(0xFFA1887F)
+val DarkBackground = Color(0xFF201A18)
+val DarkSurface = Color(0xFF2D2421)

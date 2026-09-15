@@ -10,11 +10,19 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = DarkDonutPink,
+    secondary = DarkChocolateBrown,
+    tertiary = DarkCocoaBrown,
+    background = DarkBackground,
+    surface = DarkSurface,
+    onPrimary = androidx.compose.ui.graphics.Color.Black,
+    onSecondary = androidx.compose.ui.graphics.Color.Black,
+    onTertiary = androidx.compose.ui.graphics.Color.Black,
+    onBackground = DarkChocolateBrown,
+    onSurface = DarkChocolateBrown,
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -36,14 +44,45 @@ private val LightColorScheme = lightColorScheme(
     onSurface = ChocolateBrown,
 )
 
+private val HighContrastLightColorScheme = lightColorScheme(
+    primary = Color.Black,
+    secondary = Color.Black,
+    tertiary = Color.Black,
+    background = Color.White,
+    surface = Color.White,
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    error = Color.Black
+)
+
+private val HighContrastDarkColorScheme = darkColorScheme(
+    primary = Color.White,
+    secondary = Color.White,
+    tertiary = Color.White,
+    background = Color.Black,
+    surface = Color.Black,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.Black,
+    onBackground = Color.White,
+    onSurface = Color.White,
+    error = Color.White
+)
+
 @Composable
 fun CoffeeMenuTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    highContrast: Boolean = false,
+    // Dynamic color is disabled by default to prefer custom brand colors
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
+        highContrast && darkTheme -> HighContrastDarkColorScheme
+        highContrast && !darkTheme -> HighContrastLightColorScheme
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -54,7 +93,7 @@ fun CoffeeMenuTheme(
     }
 
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )
