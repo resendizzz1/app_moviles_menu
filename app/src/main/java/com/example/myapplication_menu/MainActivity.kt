@@ -44,6 +44,14 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -66,6 +74,13 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.VolumeUp
+import android.speech.tts.TextToSpeech
+import java.util.Locale
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material3.CheckboxDefaults.colors
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
@@ -76,6 +91,7 @@ import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,12 +104,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            CoffeeMenuTheme() {
+            val altoContraste = remember { mutableStateOf(false) }
+            CoffeeMenuTheme(highContrast = altoContraste.value) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    GreetingMenu()
+                    GreetingMenu(
+                        altoContraste = altoContraste.value,
+                        onAltoContrasteChange = { altoContraste.value = it }
+                    )
                 }
             }
         }
@@ -159,7 +179,11 @@ data class Pastel(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GreetingMenu(modifier: Modifier = Modifier) {
+fun GreetingMenu(
+    modifier: Modifier = Modifier,
+    altoContraste: Boolean = false,
+    onAltoContrasteChange: (Boolean) -> Unit = {}
+) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(
         initialValue = DrawerValue.Closed
@@ -177,22 +201,26 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.fillMaxWidth(0.7f)
+                modifier = Modifier.fillMaxWidth(0.7f),
+                drawerContainerColor = MaterialTheme.colorScheme.surface
             ) {
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Panaderia",
+                    text = "Menú Principal",
+                    style = MenuTitleStyle,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
                 )
                 NavigationDrawerItem(
-                    label = { Text("Todas las Categorias") },
+                    label = { Text("Todas las Categorías") },
                     selected = categoriaSeleccionada.value == null,
                     onClick = {
                         categoriaSeleccionada.value = null
                         scope.launch {
                             drawerState.close()
                         }
-                    }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
                 categorias.forEach { categoria ->
                     NavigationDrawerItem(
@@ -203,9 +231,28 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                             scope.launch {
                                 drawerState.close()
                             }
-                        }
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )
                 }
+                
+                Spacer(modifier = Modifier.weight(1f))
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Alto Contraste", 
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Switch(
+                        checked = altoContraste,
+                        onCheckedChange = onAltoContrasteChange
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     ) {
@@ -213,6 +260,20 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
         val name = remember() { mutableStateOf("") }
         val hmuch = remember() { mutableStateOf("") }
         val context = LocalContext.current
+        val tts = remember { mutableStateOf<TextToSpeech?>(null) }
+
+        DisposableEffect(context) {
+            val ttsEngine = TextToSpeech(context) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    tts.value?.setLanguage(Locale.forLanguageTag("es"))
+                }
+            }
+            tts.value = ttsEngine
+            onDispose {
+                ttsEngine.stop()
+                ttsEngine.shutdown()
+            }
+        }
         val estadoBusqueda = rememberTextFieldState()
         val estadoSearchBar = rememberSearchBarState()
         val imagenSeleccionada = remember {
@@ -226,6 +287,7 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                     context, uri
                 )
         }
+        val mostrarFormulario = remember { mutableStateOf(false) }
 
         val pancitos = remember {
             mutableStateListOf(
@@ -239,43 +301,37 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
         val bebidas = listOf(
             Bebida("Cafe", "$15 pesos", R.drawable.cafe),
             Bebida("Cafe Cappuccino", "$22 pesos", R.drawable.cafecappu),
-            Bebida("Chocolate Caliente", "$20 pesos", R.drawable.chocohot)
+            Bebida("Chocolate Caliente", "$20 pesos", R.drawable.chocohot),
+            Bebida("Frappé de Caramelo", "$35 pesos", R.drawable.cafecappu),
+            Bebida("Té Chai Latté", "$28 pesos", R.drawable.cafe),
+            Bebida("Malteada de Fresa", "$30 pesos", R.drawable.chocohot),
+            Bebida("Café Helado", "$25 pesos", R.drawable.cafe)
         )
 
         val pasteles = listOf(
             Pastel("Pastel Merengue", "$25 pesos", R.drawable.pastelmerenge),
             Pastel("Pastel Moka", "$24 pesos", R.drawable.pastelmoka),
-            Pastel("Pastel Chocolate", "$25 pesos", R.drawable.pastelchoco)
+            Pastel("Pastel Chocolate", "$25 pesos", R.drawable.pastelchoco),
+            Pastel("Cheesecake Clásico", "$35 pesos", R.drawable.pastelmerenge),
+            Pastel("Tiramisú", "$40 pesos", R.drawable.pastelmoka),
+            Pastel("Brownie con Nuez", "$20 pesos", R.drawable.pastelchoco),
+            Pastel("Tarta de Frutas", "$30 pesos", R.drawable.pastelmerenge)
         )
 
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet {
-                    categorias.forEach { categoria ->
-                        NavigationDrawerItem(
-                            label = { Text(categoria) },
-                            selected = categoriaSeleccionada.value == categoria,
-                            onClick = {
-                                categoriaSeleccionada.value = categoria
-                                scope.launch {
-                                    drawerState.close()
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+        Box(
+            modifier = modifier.fillMaxSize()
         ) {
-            Box(
-                modifier = modifier.fillMaxSize()
-            ) {
 
-                Image(
+            Image(
                     painter = painterResource(R.drawable.menuborder),
                     contentDescription = "Fondo del menu",
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.Crop
+                )
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.7f))
                 )
 
                 val pancitosFiltrados = pancitos.filter { pancito ->
@@ -301,7 +357,7 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                         Text(
                             text = "Menu",
                             style = MenuTitleStyle,
-                            color = DonutPink,
+                            color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -331,115 +387,121 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                     }
 
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        OutlinedTextField(
-                            value = name.value,
-                            onValueChange = {
-                                name.value = it
-                            },
-                            label = {
-                                Text("Nombre del pancito")
-                            }
-                        )
-                        OutlinedTextField(
-                            value = hmuch.value,
-                            onValueChange = {
-                                hmuch.value = it
-                            },
-                            label = {
-                                Text("A cuanto el pan")
-                            }
-                        )
-                        Button(onClick = {
-                            seleccionarImagen.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }) {
-                            Text(if (imagenSeleccionada.value != null) "Imagen Seleccionada ✓" else "Seleccionar Imagen")
-                        }
-                        Button(onClick = {
-                            if (name.value.isNotBlank() && hmuch.value.isNotBlank()) {
-                                val precioTexto =
-                                    if (hmuch.value.contains("pesos") || hmuch.value.contains("$")) {
-                                        hmuch.value
-                                    } else {
-                                        "$${hmuch.value} pesos"
-                                    }
-                                pancitos.add(
-                                    Pancito(
-                                        pan = name.value,
-                                        price = precioTexto,
-                                        foto = R.drawable.donamaple,
-                                        imagePath = imagenSeleccionada.value
-                                    )
-                                )
-                                name.value = ""
-                                hmuch.value = ""
-                                imagenSeleccionada.value = null
-                            }
-                        }) {
-                            Text("Agregar Pan")
-                        }
-                    }
-
-
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Panes",
-                            style = CategoryTitleStyle,
-                            color = ChocolateBrown,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                        )
-                    }
-
-                    items(pancitosFiltrados) { pancito ->
-                        val editado = remember {
-                            mutableStateOf(false)
-                        }
-
-                        val nombreEditado = remember {
-                            mutableStateOf(pancito.pan)
-                        }
-
-                        val precioEditado = remember {
-                            mutableStateOf(pancito.price.removePrefix("$"))
-                        }
-
-                        val mostrarIngrediente = remember {
-                            mutableStateOf(false)
-                        }
-                        val nombreIngrediente = remember {
-                            mutableStateOf("")
-                        }
-                        val cantidadIngrediente = remember {
-                            mutableStateOf("")
-                        }
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 30.dp, vertical = 8.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (pancito.imagePath != null) {
-                                AsyncImage(
-                                    model = pancito.imagePath,
-                                    contentDescription = pancito.pan,
-                                    modifier = Modifier.size(80.dp),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Image(
-                                    painter = painterResource(pancito.foto),
-                                    contentDescription = pancito.pan,
-                                    modifier = Modifier.size(80.dp),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                            Column(
-                                modifier = Modifier.padding(start = 16.dp)
+                        if (mostrarFormulario.value) {
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Agregar Nuevo Producto", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                    OutlinedTextField(
+                                        value = name.value,
+                                        onValueChange = { name.value = it },
+                                        label = { Text("Nombre del pancito") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = hmuch.value,
+                                        onValueChange = { hmuch.value = it },
+                                        label = { Text("A cuanto el pan") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Button(onClick = {
+                                            seleccionarImagen.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                            )
+                                        }) {
+                                            Text(if (imagenSeleccionada.value != null) "Imagen ✓" else "Imagen")
+                                        }
+                                        Button(onClick = {
+                                            if (name.value.isNotBlank() && hmuch.value.isNotBlank()) {
+                                                val precioTexto =
+                                                    if (hmuch.value.contains("pesos") || hmuch.value.contains("$")) {
+                                                        hmuch.value
+                                                    } else {
+                                                        "$${hmuch.value} pesos"
+                                                    }
+                                                pancitos.add(
+                                                    Pancito(
+                                                        pan = name.value,
+                                                        price = precioTexto,
+                                                        foto = R.drawable.donamaple,
+                                                        imagePath = imagenSeleccionada.value
+                                                    )
+                                                )
+                                                name.value = ""
+                                                hmuch.value = ""
+                                                imagenSeleccionada.value = null
+                                                mostrarFormulario.value = false // Cierra el formulario tras agregar
+                                            }
+                                        }) {
+                                            Text("Agregar")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+
+                    if (categoriaSeleccionada.value == null || categoriaSeleccionada.value == "Donas") {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = "Panes",
+                                style = CategoryTitleStyle,
+                                color = MaterialTheme.colorScheme.secondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
+                            )
+                        }
+
+                        items(pancitosFiltrados) { pancito ->
+                            val editado = remember { mutableStateOf(false) }
+                        val nombreEditado = remember { mutableStateOf(pancito.pan) }
+                        val precioEditado = remember { mutableStateOf(pancito.price.removePrefix("$")) }
+                        val mostrarIngrediente = remember { mutableStateOf(false) }
+                        val nombreIngrediente = remember { mutableStateOf("") }
+                        val cantidadIngrediente = remember { mutableStateOf("") }
+
+                        Card(
+                            modifier = Modifier.padding(4.dp).fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (pancito.imagePath != null) {
+                                    AsyncImage(
+                                        model = pancito.imagePath,
+                                        contentDescription = pancito.pan,
+                                        modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Image(
+                                        painter = painterResource(pancito.foto),
+                                        contentDescription = pancito.pan,
+                                        modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                                Column(
+                                    modifier = Modifier.padding(start = 16.dp).weight(1f)
+                                ) {
                                 if (editado.value) {
                                     OutlinedTextField(
                                         value = nombreEditado.value,
@@ -480,12 +542,12 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                                     Text(
                                         text = pancito.pan,
                                         style = ProductNameStyle,
-                                        color = DonutPink
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
                                         text = pancito.price,
                                         style = ProductPriceStyle,
-                                        color = CocoaBrown
+                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
                                 Row(
@@ -506,6 +568,23 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                                             if (position != -1) {
                                                 pancitos[position] = pancito.copy(
                                                     disponible = nuevoEstado
+                                                )
+                                            }
+                                        },
+                                        thumbContent = if (pancito.disponible) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Disponible",
+                                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                                )
+                                            }
+                                        } else {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Agotado",
+                                                    modifier = Modifier.size(SwitchDefaults.IconSize)
                                                 )
                                             }
                                         },
@@ -561,6 +640,17 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Eliminar"
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val disp = if (pancito.disponible) "Disponible" else "Agotado"
+                                            tts.value?.speak("${pancito.pan}, precio ${pancito.price}, estado $disp", TextToSpeech.QUEUE_FLUSH, null, null)
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.VolumeUp,
+                                            contentDescription = "Leer en voz alta"
                                         )
                                     }
                                 }
@@ -624,99 +714,152 @@ fun GreetingMenu(modifier: Modifier = Modifier) {
                                         ) {
                                             Text("Agregar Ingrediente")
                                         }
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
+                    } // closes items(pancitosFiltrados)
+                    } // closes if (categoriaSeleccionada.value == null || categoriaSeleccionada.value == "Donas")
 
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Bebidas",
-                            style = CategoryTitleStyle,
-                            color = ChocolateBrown,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                        )
-                    }
-
-                    items(bebidas) { bebida ->
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 30.dp, vertical = 8.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Image(
-                                painter = painterResource(bebida.foto),
-                                contentDescription = bebida.bebida,
-                                modifier = Modifier.size(80.dp),
-                                contentScale = ContentScale.Crop
+                    if (categoriaSeleccionada.value == null || categoriaSeleccionada.value == "Drinks" || categoriaSeleccionada.value == "Bebidas") {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = "Bebidas",
+                                style = CategoryTitleStyle,
+                                color = MaterialTheme.colorScheme.secondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
                             )
-                            Column(
-                                modifier = Modifier.padding(start = 16.dp)
+                        }
+
+                        items(bebidas) { bebida ->
+                        Card(
+                            modifier = Modifier.padding(4.dp).fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = bebida.bebida,
-                                    style = ProductNameStyle,
-                                    color = DonutPink
+                                Image(
+                                    painter = painterResource(bebida.foto),
+                                    contentDescription = bebida.bebida,
+                                    modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
                                 )
-                                Text(
-                                    text = bebida.price,
-                                    style = ProductPriceStyle,
-                                    color = CocoaBrown
-                                )
+                                Column(
+                                    modifier = Modifier.padding(start = 16.dp).weight(1f)
+                                ) {
+                                    Text(
+                                        text = bebida.bebida,
+                                        style = ProductNameStyle,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = bebida.price,
+                                        style = ProductPriceStyle,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
                             }
                         }
                     }
-
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Pasteles",
-                            style = CategoryTitleStyle,
-                            color = ChocolateBrown,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                        )
                     }
 
-                    items(pasteles) { pastel ->
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 30.dp, vertical = 8.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Image(
-                                painter = painterResource(pastel.foto),
-                                contentDescription = pastel.pastel,
-                                modifier = Modifier.size(80.dp),
-                                contentScale = ContentScale.Crop
+                    if (categoriaSeleccionada.value == null || categoriaSeleccionada.value == "Postres" || categoriaSeleccionada.value == "Pasteles") {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = "Pasteles",
+                                style = CategoryTitleStyle,
+                                color = MaterialTheme.colorScheme.secondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
                             )
-                            Column(
-                                modifier = Modifier.padding(start = 16.dp)
+                        }
+
+                        items(pasteles) { pastel ->
+                        Card(
+                            modifier = Modifier.padding(4.dp).fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = pastel.pastel,
-                                    style = ProductNameStyle,
-                                    color = DonutPink
+                                Image(
+                                    painter = painterResource(pastel.foto),
+                                    contentDescription = pastel.pastel,
+                                    modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
                                 )
-                                Text(
-                                    text = pastel.price,
-                                    style = ProductPriceStyle,
-                                    color = CocoaBrown
-                                )
+                                Column(
+                                    modifier = Modifier.padding(start = 16.dp).weight(1f)
+                                ) {
+                                    Text(
+                                        text = pastel.pastel,
+                                        style = ProductNameStyle,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = pastel.price,
+                                        style = ProductPriceStyle,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
                             }
                         }
                     }
+                    } // This closes the if block
+                } // This closes the LazyVerticalGrid
 
+                // Botón flotante para mostrar/ocultar formulario de agregar producto
+                FloatingActionButton(
+                    onClick = {
+                        mostrarFormulario.value = !mostrarFormulario.value
+                    },
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .align(Alignment.BottomEnd),
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        imageVector = if (mostrarFormulario.value) Icons.Default.Close else Icons.Default.Add,
+                        contentDescription = "Alternar Formulario de Registro"
+                    )
+                }
+
+                // Botón de hamburguesa para el menú lateral (bajado para evitar la barra de estado)
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            drawerState.open()
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(top = 40.dp, start = 16.dp)
+                        .align(Alignment.TopStart)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Abrir Menú Lateral",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
     }
-}
-
